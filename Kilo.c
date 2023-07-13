@@ -1,4 +1,4 @@
-/***includes***/
+/***Includes***/
 #include <ctype.h>
 #include <stdio.h>
 #include <termios.h>
@@ -14,8 +14,17 @@
 #define ABUF_INIT {NULL,0}
 #define ISLAND_VERSION "0.0.1"
 
+enum editorKey{
+
+	ARROW_LEFT = 1000,
+	ARROW_RIGHT,
+	ARROW_UP,
+	ARROW_DOWN
+};
+
 /***Data***/
 struct editorConfig{
+	int cx , cy;
 	int screenrows;
 	int screencols;
 	struct termios orig_termios;
@@ -40,7 +49,8 @@ void abAppend(struct abuf *ab, const char *s, int len);
 void abFree(struct abuf *ab);
 
 /***input***/
-char editorReadKey();
+int editorReadKey();
+void editorMoveCursor(int key);
 
 /***output***/
 void editorRefreshScreen();
@@ -48,6 +58,8 @@ void editorDrawRows(struct abuf *ab);
 
 /***Init***/
 void initeditor(){
+	E.cx = 0;
+	E.cy = 0;
 	if(getWindowSize(&E.screenrows,&E.screencols) == -1){die("getWindowSize");}
 }
 
@@ -111,6 +123,8 @@ int getWindowSize(int* rows , int* cols){
 	}
 }
 
+
+
 void editorDrawRows(struct abuf *ab){
 	int y;
 	for(y = 0 ; y < E.screenrows ; y++)
@@ -148,12 +162,16 @@ void editorRefreshScreen(){
 	struct abuf ab = ABUF_INIT;
 	
 	abAppend(&ab,"\1xb[?25l",6);// turn off cursor
-	abAppend(&ab,"\x1b[H",3);
+	abAppend(&ab,"\x1b[H",3);// Cursor Position
 
 
 	editorDrawRows(&ab);
+	
+	char buf[32];
+	snprintf(buf, sizeof(buf) , "\x1b[%d;%dH" , E.cy+1 , E.cx+1);
+	abAppend(&ab, buf, strlen(buf));
 
-	abAppend(&ab , "\x1b[H",3);
+	
 	abAppend(&ab , "\x1b[25h",6);// turn on cursor 
 	
 	write(STDOUT_FILENO , ab.b, ab.len);
@@ -161,24 +179,68 @@ void editorRefreshScreen(){
 	abFree(&ab);
 }
 
-char editorReadKey(){
+int editorReadKey(){
 	int nread;
 	char c ;
 	while((nread = read(STDIN_FILENO, &c,1)) != 1){
 		if(nread == -1 && errno != EAGAIN) {die("read");}
 	}
 
-	return c;
+	if (c == '\x1b') {
+		char seq[3];
+		if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';//  when escape is read , we read two more into seq[3]
+		if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';//  and check for the following
+		
+		if (seq[0] == '['){
+			switch (seq[1]) {
+				case 'A': return ARROW_UP;
+				case 'B': return ARROW_DOWN;
+				case 'C': return ARROW_RIGHT;
+				case 'D': return ARROW_LEFT;
+			}
+		}
+		
+		return '\x1b';// default
+	 }else {return c;}
 }
 
 void editorProcessKeypress(){
-	char c = editorReadKey();
+	int c = editorReadKey();
 	switch (c) {
 		case CTRL_KEY('q'):
 			write(STDOUT_FILENO, "\x1b[2J",4 );
 			write(STDOUT_FILENO, "\x1b[H", 3);
 			exit(0);
+			break;
+		
+		case ARROW_UP:
+		case ARROW_DOWN:
+		case ARROW_LEFT:
+		case ARROW_RIGHT:
+			editorMoveCursor(c);
+			break;
+	}
+}
+
+void editorMoveCursor(int key){
+	switch (key){
+		
+		case ARROW_LEFT:
+		E.cx--;
 		break;
+
+		case ARROW_RIGHT:
+		E.cx++;
+		break;
+
+		case ARROW_UP:
+		E.cy--;
+		break;
+
+		case ARROW_DOWN:
+		E.cy++;
+		break;
+		
 	}
 }
 
