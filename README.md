@@ -1,4 +1,4 @@
-# Box
+# Island
 its a fun perosnal project , i am using C languge to impliment my own fun type of editing that i like 
 i am Making  text editor inspired from Kilo text editor which allows typing anywhere on the screen with a box type layout 
 
