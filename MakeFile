@@ -1,2 +1,2 @@
-Kilo:Kilo.c
-	$(cc) kilo.c -o kilo -Wall -Wextra -pedantic -std=c99
+island:island.c
+	$(cc) island.c -o island -Wall -Wextra -pedantic -std=c99
